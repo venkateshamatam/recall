@@ -1,6 +1,6 @@
 {
   "name": "recall-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "One memory pool for every AI agent on your machine. MCP server with shared SQLite-backed memory.",
   "type": "module",
   "bin": {

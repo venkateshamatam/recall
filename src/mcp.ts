@@ -10,7 +10,7 @@ const text = (value: unknown) => ({
 
 export function buildServer() {
   const server = new McpServer(
-    { name: "recall", version: "0.3.2" },
+    { name: "recall", version: "0.3.3" },
     {
       instructions:
         "shared cross-agent memory. recall_search before answering anything personal or project-specific. " +

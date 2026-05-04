@@ -2,7 +2,7 @@
 
 Cross-agent memory for AI coding assistants. One local SQLite database, every MCP-capable agent on your Mac reads and writes it.
 
-Save a fact in Claude Code. Search it from Cursor. Use it in Claude Desktop. No cloud, no account, no LLM in the hot path.
+If you switch between AI agents during a project, recall keeps what each one learns about you in a single place the others can read.
 
 ## Install
 
@@ -16,11 +16,13 @@ Requires Node 20 or later. macOS only.
 
 ## What gets installed
 
-`recall install --all` wires three layers across every detected agent:
+`recall install --all` does a few things.
 
-1. **MCP server** in Claude Code, Claude Desktop, Cursor, Windsurf, and Zed. Exposes `recall_save`, `recall_search`, `recall_list`, `recall_get`, `recall_delete`.
-2. **Auto-capture** via the Claude Code `SessionEnd` hook. The last assistant turn from each session is saved automatically, tagged with the current git project.
-3. **Auto-inject** via the Claude Code `UserPromptSubmit` hook plus a Cursor user rule and an `AGENTS.md` block. Relevant memories are injected into the model's context before each prompt, without the agent having to call a tool.
+It registers a local MCP server with Claude Code, Claude Desktop, Cursor, Windsurf, and Zed. The server exposes five tools: `recall_save`, `recall_search`, `recall_list`, `recall_get`, and `recall_delete`.
+
+It adds a Claude Code `SessionEnd` hook so the last assistant turn from each session gets saved automatically and tagged with the current git project.
+
+It wires the auto-inject layer. That's a `UserPromptSubmit` hook for Claude Code, a user rule at `~/.cursor/rules/recall.mdc`, and a marker block in `~/.agents/AGENTS.md`. The Claude Code hook prints relevant memories to stdout before each prompt, and Claude Code merges that into the model's context. Cursor and Claude Desktop fall back to the rule and the MCP tools.
 
 ## Storage
 
@@ -29,7 +31,7 @@ Requires Node 20 or later. macOS only.
 ~/.recall/models/          all-MiniLM-L6-v2 quantized, ~23 MB, downloaded once
 ```
 
-Embeddings run on-device via `transformers.js`. Nothing leaves your machine after the model download. To sync across machines, point `~/.recall` at iCloud, Dropbox, or syncthing.
+Embeddings run on-device via `transformers.js`. The model downloads once on first use, and after that recall does not make network calls. To sync across machines, point `~/.recall` at iCloud, Dropbox, or syncthing.
 
 ## CLI
 
@@ -52,8 +54,6 @@ recall inject                     print recall context to stdout (used by UserPr
 
 ## Granular control
 
-To install only part of the stack:
-
 ```bash
 recall install --all --bare       MCP wiring only, skip auto-inject and auto-capture
 recall auto install               just the auto-inject layer
@@ -62,21 +62,13 @@ recall hooks install --all        just the auto-capture layer
 recall hooks uninstall --all      remove the auto-capture layer
 ```
 
-## How auto-inject works
-
-Claude Code's `UserPromptSubmit` hook runs before the model sees a user prompt. Anything the hook prints to stdout is added to the model's context for that turn. `recall inject` reads the hook event from stdin, runs a project-scoped semantic search against `~/.recall/db.sqlite`, and prints the top matches inside a `<recall-memory>` block.
-
-Cursor and Claude Desktop don't have stdin-piped hooks, so they get the MCP tools plus a `~/.cursor/rules/recall.mdc` rule that tells the model to call `recall_search` first. That path is a nudge, not a guarantee.
-
 ## Paste-into-any-agent install
-
-If you'd rather not run the install script yourself:
 
 ```bash
 recall setup-prompt | pbcopy
 ```
 
-Paste the output into any agent that can run shell commands. It will install recall, wire every MCP client, and verify with `recall doctor`.
+Paste the output into any agent that can run shell commands. It runs the install and verifies with `recall doctor`.
 
 ## License
 

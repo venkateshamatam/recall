@@ -1,15 +1,19 @@
-.DS_Store
+# build artifacts
 node_modules/
 dist/
-coverage/
-.env
-.env.*
-*.log
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
+*.tsbuildinfo
 
-.claude/
+# local data
+.recall/
+
+# session-local internal artifacts (not for the public repo)
 DESIGN.md
 HANDOFF.md
-LICENSE
+CLAUDE.md
+.gstack/
+
+# os / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

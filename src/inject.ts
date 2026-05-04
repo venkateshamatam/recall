@@ -4,7 +4,7 @@ import { currentProject } from "./project.js";
 
 // claude code's UserPromptSubmit hook pipes a json event on stdin. anything we
 // write to stdout gets injected into the model's context before it responds.
-// the agent doesn't decide to call recall — it just gets the context for free.
+// the agent doesn't have to decide to call recall, it gets the context for free.
 // docs: https://docs.anthropic.com/en/docs/claude-code/hooks
 const MAX_MEMORIES = 8;
 
@@ -20,7 +20,7 @@ export async function inject(opts: { seed?: string } = {}) {
     ? await searchMemories(seed, MAX_MEMORIES, project)
     : listMemories(MAX_MEMORIES, project);
 
-  if (!memories.length) return; // nothing to inject — say nothing.
+  if (!memories.length) return; // nothing to inject, say nothing.
 
   const lines = [
     "<recall-memory>",

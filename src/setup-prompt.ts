@@ -1,20 +1,21 @@
 // paste this into an agent that can run shell commands.
-export const SETUP_PROMPT = `Install \`recall\` — a local MCP server that gives every AI agent on my machine
-ONE shared memory pool. Run these in order, stop and tell me if anything fails.
+export const SETUP_PROMPT = `i want to install \`recall\` (https://github.com/venkateshamatam/recall),
+a local mcp server that gives every ai agent on this mac one shared memory pool.
+run these in order. stop and tell me if anything fails.
 
   curl -fsSL https://raw.githubusercontent.com/venkateshamatam/recall/main/install.sh | sh
-  recall --version                # confirm the bin is on PATH
-  recall init                     # ~/.recall/, downloads the embedding model once
-  recall install --all            # wires every detected MCP-capable agent
-  recall hooks install --all      # auto-saves every session end as a memory
-  recall doctor                   # should be all green
+  recall --version
+  recall init
+  recall install --all
+  recall doctor
 
-Smoke test: \`recall add "hello from $(hostname) at $(date)"\` then
-\`recall search "hello"\` should return that memory.
+quick smoke test:
+  recall add "hello from $(hostname) at $(date)"
+  recall search "hello"
 
-Then tell me which agents need a restart for the new MCP server to load
-(Claude Desktop and Cursor do; Claude Code picks it up next session).
+then tell me which apps need a restart. claude desktop and cursor do, claude
+code picks up the new mcp server on its next session.
 
-Don't touch any config file recall doesn't manage. Don't share the contents
-of ~/.recall/ — it stays local.
+don't touch any config file recall doesn't manage. don't paste contents of
+~/.recall/ anywhere, it's local on purpose.
 `;

@@ -2,27 +2,27 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 
-const HELP = `recall ${VERSION} — magic memory across every agent on your machine
+const HELP = `recall ${VERSION}, shared memory for ai agents on your mac.
 
   recall init                       set up ~/.recall/, download embedding model
-  recall install [--all|--agent X]  wire recall into every mcp client + auto-inject + auto-capture
-  recall auto install|uninstall     just the auto-inject layer (UserPromptSubmit + cursor rule + AGENTS.md)
-  recall hooks install [--all|--agent X]   just the auto-capture layer (SessionEnd)
+  recall install [--all|--agent X]  wire mcp + auto-inject + auto-capture
+  recall auto install|uninstall     just the auto-inject layer (UserPromptSubmit hook + cursor rule + AGENTS.md)
+  recall hooks install [--all|--agent X]   just the auto-capture layer (SessionEnd hook)
   recall context [--project X] [--seed Q]  write ~/.recall/context-<project>.md for @-import
-  recall setup-prompt               paste-ready installer prompt for any agent
-  recall doctor                     verify install + auto + hook status
+  recall setup-prompt               paste-into-any-agent installer prompt
+  recall doctor                     check what's wired
 
   recall add <text> [--project X]   save a memory (defaults to current project)
   recall capture [--agent X]        save piped transcript (used by SessionEnd hooks)
-  recall inject [--seed Q]          print recall context for stdout-injection (used by UserPromptSubmit hooks)
+  recall inject [--seed Q]          print recall context to stdout (used by UserPromptSubmit hooks)
   recall search <q> [-l N] [--all|--project X]
   recall list [-l N] [--all|--project X]
   recall get <id>
   recall delete <id>
 
-  recall server                     start the mcp server
+  recall server                     run the mcp server
   recall export [<file>]            dump all memories as json
 `;
 
@@ -121,7 +121,7 @@ async function cmdAdd(rest: string[]) {
 
 async function cmdCapture(rest: string[]) {
   const { values } = parseArgs({ args: rest, options: { agent: { type: "string" }, file: { type: "string" } } });
-  // never let capture take down the agent's session — swallow errors.
+  // never let capture take down the agent's session, swallow errors.
   try {
     const { capture } = await import("./capture.js");
     await capture({ agent: values.agent, file: values.file });
@@ -206,15 +206,14 @@ async function cmdInstall(rest: string[]) {
       failed++;
     }
   }
-  // when the user asked for the full setup (--all), also wire the magic
-  // auto-inject + auto-capture layers so memories show up without anyone
-  // asking. opt-out by passing --bare.
+  // --all also wires the auto-inject + auto-capture layers by default so memories
+  // surface without the agent having to call anything. pass --bare to skip.
   if (values.all && !values.bare) {
-    console.log("\nturning on auto-inject + auto-capture (zero agent action needed)...");
+    console.log("\nwiring auto-inject + auto-capture...");
     await runAutoInstall(bin);
     await runHookInstall(bin);
   }
-  console.log("\nrestart claude desktop / cursor; claude code picks it up next session.");
+  console.log("\nrestart claude desktop and cursor. claude code picks it up next session.");
   if (failed) process.exit(1);
 }
 
@@ -282,7 +281,7 @@ async function cmdHooks(rest: string[]) {
       failed++;
     }
   }
-  if (sub === "install") console.log("\nevery session-end auto-saves a memory tagged with the current project. magic.");
+  if (sub === "install") console.log("\nclaude code session ends now save a memory tagged with the current project.");
   if (failed) process.exit(1);
 }
 

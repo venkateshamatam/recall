@@ -6,7 +6,7 @@ import { readJson, tryReadJson, writeJson } from "./json.js";
 const HOME = homedir();
 const APP_SUPPORT = join(HOME, "Library", "Application Support");
 
-// claude code is the odd one — config is ~/.claude.json (file), data lives in ~/.claude/.
+// claude code is the odd one: its config is ~/.claude.json (file), data lives in ~/.claude/.
 // every other agent has the config under its install dir.
 export interface Agent {
   id: string;
@@ -32,7 +32,7 @@ export const isConfigured = (a: Agent) => Boolean(tryReadJson(a.configPath)?.[a.
 
 // a symlinked config file could redirect us into an arbitrary location. parent
 // dirs are fine to be symlinks (e.g. /tmp → /private/tmp on macos, ~/Library
-// paths can be linked too) — we only block if the leaf itself is a symlink.
+// paths can be linked too). only block when the leaf itself is a symlink.
 function assertNotSymlink(path: string) {
   if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
     throw new Error(`refusing to follow symlink: ${path}`);

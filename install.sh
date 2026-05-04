@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# install recall — magic shared memory across every ai agent on your mac.
-# downloads the latest github release, links a `recall` binary into ~/.local/bin.
+# install recall: shared memory for ai agents on this mac.
+# pulls the latest github release, builds it, links a `recall` binary into ~/.local/bin.
 set -eu
 
 REPO="venkateshamatam/recall"
@@ -10,7 +10,7 @@ BIN_DIR="${RECALL_BIN_DIR:-$HOME/.local/bin}"
 err() { printf "error: %s\n" "$*" >&2; exit 1; }
 note() { printf "%s\n" "$*"; }
 
-# require node 20+. better-sqlite3 ships native bindings that bun can't load yet.
+# need node 20+. better-sqlite3 ships native bindings that bun can't load yet.
 command -v node >/dev/null 2>&1 || err "node not found. install node 20+ from https://nodejs.org and retry."
 NODE_MAJOR=$(node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))')
 [ "$NODE_MAJOR" -ge 20 ] || err "node $NODE_MAJOR detected; recall needs >= 20."
@@ -24,7 +24,7 @@ else
   err "neither curl nor wget on PATH."
 fi
 
-# resolve the latest release tag via github's redirect — no auth, no jq.
+# resolve the latest release tag via github's redirect. no auth, no jq.
 note "→ resolving latest release..."
 TAG=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed -E 's|.*/tag/||')
 [ -n "$TAG" ] || err "could not resolve latest release. is the repo public yet?"
@@ -40,24 +40,21 @@ tar -xzf "$TMP/recall.tgz" -C "$TMP"
 SRC=$(find "$TMP" -maxdepth 1 -type d -name 'recall-*' | head -1)
 [ -d "$SRC" ] || err "extracted archive looks empty."
 
-# install runtime deps. we ship dist/ in the release tag so users don't compile,
-# but better-sqlite3 + sqlite-vec + transformers.js have native parts that
-# resolve to the right prebuilt binaries for the host on `npm install`.
+# better-sqlite3, sqlite-vec, and transformers.js have native parts. let npm
+# resolve the right prebuilt binaries for this host instead of shipping them.
 note "→ installing dependencies (one time, ~30s)..."
 mkdir -p "$INSTALL_DIR"
 rm -rf "$INSTALL_DIR"/*
 cp -R "$SRC"/* "$INSTALL_DIR"/
 cd "$INSTALL_DIR"
-command -v npm >/dev/null 2>&1 || err "npm not found (it ships with node — try \`brew install node\`)."
-# install runtime deps + a few build deps (typescript, @types/node) so we can
-# compile from source. keeps the github tarball tiny and avoids shipping
-# host-specific native binaries in the repo.
+command -v npm >/dev/null 2>&1 || err "npm not found (it ships with node, try \`brew install node\`)."
+# install runtime + a couple of build deps so we can compile from source.
 npm install --silent --no-audit --no-fund
 
 note "→ building..."
 npm run build --silent
 
-# drop devDependencies after build to slim the install footprint.
+# drop devDependencies after build.
 npm prune --omit=dev --silent --no-audit --no-fund 2>/dev/null || true
 
 mkdir -p "$BIN_DIR"
@@ -71,7 +68,7 @@ note "  files:  $INSTALL_DIR"
 note ""
 case ":$PATH:" in
   *":$BIN_DIR:"*) note "next: \`recall init\`" ;;
-  *) note "$BIN_DIR is not on your PATH. add this to ~/.zshrc or ~/.bashrc:"
+  *) note "$BIN_DIR is not on your PATH yet. add this to ~/.zshrc or ~/.bashrc:"
      note ""
      note "  export PATH=\"$BIN_DIR:\$PATH\""
      note ""

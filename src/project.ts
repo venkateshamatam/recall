@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
-// project id from .git/config, fallback to cwd basename. no subprocess —
-// recall save runs on every hook, the cost adds up.
+// project id from .git/config, fallback to cwd basename. no subprocess: recall
+// save runs on every hook and the cost adds up.
 export function currentProject(cwd = process.cwd()): string {
   const config = findGitConfig(cwd);
   if (config) {

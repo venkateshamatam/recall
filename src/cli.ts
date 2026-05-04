@@ -2,7 +2,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-const VERSION = "0.3.1";
+const VERSION = "0.3.2";
 
 const HELP = `recall ${VERSION}, shared memory for ai agents on your mac.
 

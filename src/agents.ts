@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { readJson, tryReadJson, writeJson } from "./json.js";
@@ -30,11 +30,13 @@ export const isInstalled = (a: Agent) => existsSync(installRoot(a)) || existsSyn
 export const detectInstalled = () => AGENTS.filter(isInstalled);
 export const isConfigured = (a: Agent) => Boolean(tryReadJson(a.configPath)?.[a.serverKey]?.recall);
 
-// a symlinked config could redirect us into an arbitrary file. don't.
+// a symlinked config file could redirect us into an arbitrary location. parent
+// dirs are fine to be symlinks (e.g. /tmp → /private/tmp on macos, ~/Library
+// paths can be linked too) — we only block if the leaf itself is a symlink.
 function assertNotSymlink(path: string) {
-  if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error(`refusing to follow symlink: ${path}`);
-  const parent = dirname(path);
-  if (existsSync(parent) && realpathSync(parent) !== parent) throw new Error(`refusing to write through symlinked dir: ${parent}`);
+  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+    throw new Error(`refusing to follow symlink: ${path}`);
+  }
 }
 
 // returns { changed, existed } so the caller picks the verb.

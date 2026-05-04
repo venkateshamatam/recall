@@ -2,20 +2,21 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const HELP = `recall ${VERSION} — magic memory across every agent on your machine
 
   recall init                       set up ~/.recall/, download embedding model
-  recall install [--all|--agent X]  wire recall into mcp clients (claude-desktop|claude-code|cursor|windsurf|zed)
-  recall hooks install [--all|--agent X]   auto-capture session ends as memories
-  recall hooks uninstall [--all|--agent X]
+  recall install [--all|--agent X]  wire recall into every mcp client + auto-inject + auto-capture
+  recall auto install|uninstall     just the auto-inject layer (UserPromptSubmit + cursor rule + AGENTS.md)
+  recall hooks install [--all|--agent X]   just the auto-capture layer (SessionEnd)
   recall context [--project X] [--seed Q]  write ~/.recall/context-<project>.md for @-import
   recall setup-prompt               paste-ready installer prompt for any agent
-  recall doctor                     verify install + agent + hook status
+  recall doctor                     verify install + auto + hook status
 
   recall add <text> [--project X]   save a memory (defaults to current project)
-  recall capture [--agent X]        save piped transcript text (used by hooks)
+  recall capture [--agent X]        save piped transcript (used by SessionEnd hooks)
+  recall inject [--seed Q]          print recall context for stdout-injection (used by UserPromptSubmit hooks)
   recall search <q> [-l N] [--all|--project X]
   recall list [-l N] [--all|--project X]
   recall get <id>
@@ -46,12 +47,14 @@ async function dispatch(cmd: string, rest: string[]) {
     case "setup-prompt":  return process.stdout.write((await import("./setup-prompt.js")).SETUP_PROMPT);
     case "add":           return cmdAdd(rest);
     case "capture":       return cmdCapture(rest);
+    case "inject":        return cmdInject(rest);
     case "search":        return cmdSearch(rest);
     case "list":          return cmdList(rest);
     case "get":           return cmdGet(rest);
     case "delete":        return cmdDelete(rest);
     case "install":       return cmdInstall(rest);
     case "hooks":         return cmdHooks(rest);
+    case "auto":          return cmdAuto(rest);
     case "context":       return cmdContext(rest);
     case "export":        return cmdExport(rest[0]);
     default:              console.error(`unknown command: ${cmd}\n\n${HELP}`); process.exit(2);
@@ -97,8 +100,14 @@ async function cmdDoctor() {
     const state = !isInstalled(a) ? "not installed" : isConfigured(a) ? "✓ wired" : "✗ not wired";
     console.log(`  ${a.name.padEnd(16)} ${state}`);
   }
-  console.log("\nauto-capture hooks:");
+  console.log("\nauto-capture hooks (SessionEnd → recall capture):");
   for (const h of HOOK_TARGETS) console.log(`  ${h.name.padEnd(16)} ${isHookInstalled(h) ? "✓ installed" : "✗ not installed"}`);
+
+  const auto = await import("./auto.js");
+  console.log("\nauto-inject (UserPromptSubmit → recall inject):");
+  console.log(`  Claude Code      ${auto.isClaudeCodeAuto() ? "✓ installed" : "✗ not installed"}`);
+  console.log(`  Cursor           ${auto.isCursorAuto() ? "✓ rule present" : "✗ rule missing"}`);
+  console.log(`  AGENTS.md        ${auto.isAgentsMdAuto(auto.AGENTS_MD_PATH) ? "✓ block present" : "✗ block missing"}`);
 }
 
 async function cmdAdd(rest: string[]) {
@@ -118,6 +127,18 @@ async function cmdCapture(rest: string[]) {
     await capture({ agent: values.agent, file: values.file });
   } catch (e) {
     console.error(`recall capture: ${(e as Error).message}`);
+  }
+}
+
+async function cmdInject(rest: string[]) {
+  const { values } = parseArgs({ args: rest, options: { seed: { type: "string" } } });
+  // hot path: claude code blocks the user's prompt on this. errors must never
+  // print to stdout (they'd leak into the agent's context). swallow + stay silent.
+  try {
+    const { inject } = await import("./inject.js");
+    await inject({ seed: values.seed });
+  } catch (e) {
+    console.error(`recall inject: ${(e as Error).message}`);
   }
 }
 
@@ -164,7 +185,11 @@ async function cmdDelete(rest: string[]) {
 }
 
 async function cmdInstall(rest: string[]) {
-  const { values } = parseArgs({ args: rest, options: { all: { type: "boolean" }, agent: { type: "string", multiple: true } } });
+  const { values } = parseArgs({ args: rest, options: {
+    all: { type: "boolean" },
+    agent: { type: "string", multiple: true },
+    bare: { type: "boolean" },
+  } });
   const { AGENTS, configure, detectInstalled, findAgent } = await import("./agents.js");
   const targets = values.all ? detectInstalled()
     : (values.agent ?? []).map((id) => findAgent(id) ?? die(`unknown agent: ${id}. known: ${AGENTS.map((a) => a.id).join(", ")}`));
@@ -181,8 +206,59 @@ async function cmdInstall(rest: string[]) {
       failed++;
     }
   }
+  // when the user asked for the full setup (--all), also wire the magic
+  // auto-inject + auto-capture layers so memories show up without anyone
+  // asking. opt-out by passing --bare.
+  if (values.all && !values.bare) {
+    console.log("\nturning on auto-inject + auto-capture (zero agent action needed)...");
+    await runAutoInstall(bin);
+    await runHookInstall(bin);
+  }
   console.log("\nrestart claude desktop / cursor; claude code picks it up next session.");
   if (failed) process.exit(1);
+}
+
+async function runAutoInstall(bin: string) {
+  const auto = await import("./auto.js");
+  const { currentProject } = await import("./project.js");
+  try {
+    const cc = auto.installClaudeCode(bin);
+    console.log(`  ${cc ? "✓" : "="} Claude Code: ${cc ? "UserPromptSubmit hook installed" : "already installed"}`);
+  } catch (e) { console.error(`  ✗ Claude Code: ${(e as Error).message}`); }
+  try {
+    const cu = auto.installCursor();
+    console.log(`  ${cu ? "✓" : "="} Cursor: ${cu ? "user rule written to ~/.cursor/rules/recall.mdc" : "rule already present"}`);
+  } catch (e) { console.error(`  ✗ Cursor: ${(e as Error).message}`); }
+  try {
+    const md = auto.installAgentsMd(auto.AGENTS_MD_PATH, currentProject());
+    console.log(`  ${md ? "✓" : "="} AGENTS.md: ${md ? `recall block written to ${auto.AGENTS_MD_PATH}` : "block already present"}`);
+  } catch (e) { console.error(`  ✗ AGENTS.md: ${(e as Error).message}`); }
+}
+
+async function runHookInstall(bin: string) {
+  const { HOOK_TARGETS, installHook } = await import("./hooks.js");
+  for (const t of HOOK_TARGETS) {
+    try {
+      const changed = installHook(t, bin);
+      console.log(`  ${changed ? "✓" : "="} ${t.name}: ${changed ? "SessionEnd capture installed" : "already installed"}`);
+    } catch (e) { console.error(`  ✗ ${t.name}: ${(e as Error).message}`); }
+  }
+}
+
+async function cmdAuto(rest: string[]) {
+  const [sub] = rest;
+  if (sub !== "install" && sub !== "uninstall") return die("usage: recall auto install|uninstall");
+  if (sub === "install") {
+    await runAutoInstall(recallBin());
+    console.log("\nrestart claude desktop / cursor for changes to take effect.");
+    return;
+  }
+  const auto = await import("./auto.js");
+  let any = false;
+  if (auto.uninstallClaudeCode())  { console.log("✓ Claude Code: hook removed"); any = true; }
+  if (auto.uninstallCursor())      { console.log("✓ Cursor: rule cleared"); any = true; }
+  if (auto.uninstallAgentsMd(auto.AGENTS_MD_PATH)) { console.log(`✓ AGENTS.md: block removed from ${auto.AGENTS_MD_PATH}`); any = true; }
+  if (!any) console.log("nothing to remove.");
 }
 
 async function cmdHooks(rest: string[]) {

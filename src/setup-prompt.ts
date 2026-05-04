@@ -2,7 +2,7 @@
 export const SETUP_PROMPT = `Install \`recall\` — a local MCP server that gives every AI agent on my machine
 ONE shared memory pool. Run these in order, stop and tell me if anything fails.
 
-  curl -fsSL https://raw.githubusercontent.com/vmatam/recall/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/venkateshamatam/recall/main/install.sh | sh
   recall --version                # confirm the bin is on PATH
   recall init                     # ~/.recall/, downloads the embedding model once
   recall install --all            # wires every detected MCP-capable agent

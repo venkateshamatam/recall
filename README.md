@@ -5,7 +5,7 @@
 **Magic memory across every AI agent on your machine.** Local. Fast. No cloud, no account, no LLM in the hot path.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vmatam/recall/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/venkateshamatam/recall/main/install.sh | sh
 recall init
 recall install --all          # wires Claude Desktop, Claude Code, Cursor, Windsurf, Zed
 recall hooks install --all    # auto-saves every session end. magic.

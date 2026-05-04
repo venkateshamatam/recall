@@ -3,7 +3,7 @@
 # downloads the latest github release, links a `recall` binary into ~/.local/bin.
 set -eu
 
-REPO="vmatam/recall"
+REPO="venkateshamatam/recall"
 INSTALL_DIR="${RECALL_INSTALL_DIR:-$HOME/.local/share/recall}"
 BIN_DIR="${RECALL_BIN_DIR:-$HOME/.local/bin}"
 

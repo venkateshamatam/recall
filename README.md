@@ -1,48 +1,106 @@
 # recall
 
-One memory pool for every AI agent on your machine.
+> Tell Claude on Monday. Cursor knows on Tuesday. Codex knows on Wednesday.
 
-> Tell Claude on Monday. Cursor knows on Tuesday. ChatGPT knows on Wednesday.
+**Magic memory across every AI agent on your machine.** Local. Fast. No cloud, no account, no LLM in the hot path.
 
-Every agent has its own little memory today. Claude Code has one. Cursor has one. Claude Desktop, ChatGPT, all of them. None of them talk to each other, so anything you tell one is invisible to the rest. `recall` is a small MCP server that runs on your machine and lets all of them read and write the same memory.
+```bash
+curl -fsSL https://raw.githubusercontent.com/vmatam/recall/main/install.sh | sh
+recall init
+recall install --all          # wires Claude Desktop, Claude Code, Cursor, Windsurf, Zed
+recall hooks install --all    # auto-saves every session end. magic.
+```
 
-## Why
+That's it. Now every agent reads from the same memory pool, and every session you finish automatically saves itself.
 
-If you run a few agents at once, you end up saying the same things over and over. Your role, your preferences, the project you're on, the decisions you already made. The big labs aren't going to fix this, because shared memory makes their tools easier to leave. So it has to come from outside.
+> Requires Node 20+. The installer puts a `recall` binary on your PATH.
+
+---
+
+## What you get
+
+**1. One shared memory across every agent.**
+Tell Claude Code "I prefer Knex over Prisma." Cursor knows it tomorrow. ChatGPT knows it Friday. The big labs won't fix this, because shared memory weakens lock-in. So this is the answer.
+
+**2. Auto-capture, no LLM in the hot path.**
+`recall hooks install --agent claude-code` adds a `SessionEnd` hook. When your Claude Code session ends, recall reads the transcript, pulls the last assistant turn, and saves it tagged with the current git project. No agent SDK call, no compression latency, no waiting. Other tools compress with an LLM at session end and add seconds of latency. recall just writes.
+
+**3. Project-scoped by default.**
+Every memory is tagged with the project (from `git remote get-url origin`). Search defaults to the current project. Pass `--all` to query the global pool. Personal preferences travel everywhere; project context stays put.
+
+**4. Live context for AGENTS.md / CLAUDE.md.**
+```bash
+recall context  # writes ~/.recall/context-<project>.md
+```
+Drop `@~/.recall/context-myorg-myrepo.md` into your CLAUDE.md or AGENTS.md and every new session starts pre-warmed with the top relevant memories for that repo. No agent action required.
+
+---
 
 ## How it works
 
 ```
-   Claude Code     Cursor     Claude Desktop     ...any MCP client
-        \            |              /
-         \           |             /
-          \          |            /
-           ──────────┼──────────── MCP (stdio)
-                     │
-              recall MCP server
-                     │
-              SQLite + sqlite-vec
-                ~/.recall/db
+   Claude Code     Cursor     Claude Desktop     Codex     ...any MCP client
+        \            |            |               /
+         \           |            |              /
+          ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ┼─ ─ ─ ─ ─ ─ ─    MCP (stdio)
+                     │            │
+              ┌──────▼────────────▼──────┐
+              │   recall MCP server      │
+              │   + Stop hooks (auto)    │
+              └──────────┬───────────────┘
+                         │
+                  ┌──────▼──────┐
+                  │  SQLite +   │
+                  │  sqlite-vec │
+                  │ ~/.recall/  │
+                  └─────────────┘
 ```
 
-One MCP server. Six tools: `recall_save`, `recall_search`, `recall_list`, `recall_get`, `recall_delete`, `recall_tags`. Every agent reads and writes the same SQLite file on your machine, so a memory saved in one agent shows up in the rest.
+Five MCP tools every agent gets: `recall_save`, `recall_search`, `recall_list`, `recall_get`, `recall_delete`.
 
-## Features
+Auto-capture is opt-in (`recall hooks install`) and a one-line entry in your agent's settings file. Uninstall any time.
 
-- Works with any MCP client. No per-agent integration.
-- Local-first. Memories live in `~/.recall/`. No cloud, no account, no network calls.
-- Semantic search via transformers.js (`all-MiniLM-L6-v2`), running locally. No OpenAI key.
-- It's just SQLite under the hood, so you can inspect it, back it up, or sync it however you want.
+---
 
 ## CLI
 
 ```
-recall init               Set up ~/.recall/, print MCP config for each agent
-recall add "<text>"       Save a memory from the terminal
-recall search "<query>"   Search memories
-recall list               Show recent memories
-recall server             Start the MCP server (used by MCP config)
-recall doctor             Verify install and detect configured agents
-recall export             Dump memories to JSON
-recall import <file>      Load memories from JSON
+recall init                            ~/.recall/, downloads embedding model
+recall install --all                   wire mcp into every detected agent
+recall hooks install --all             auto-save session ends as memories
+recall context [--project X]           write ~/.recall/context-<project>.md
+recall doctor                          verify install + agent + hook status
+recall setup-prompt                    paste-ready installer prompt for any agent
+
+recall add <text> [--project X]        save a memory
+recall capture [--agent X]             save piped transcript (used by hooks)
+recall search <q> [-l N] [--all]
+recall list [-l N] [--all]
+recall get <id>
+recall delete <id>
+
+recall server                          start the mcp server
+recall export [<file>]                 dump all memories as json
 ```
+
+## The "one prompt" install
+
+Don't want to touch your terminal? Run `recall setup-prompt | pbcopy` and paste into any agent that can run shell commands. The agent installs recall, wires every MCP client, installs the Stop hooks, and reports back.
+
+## Local-first by design
+
+- `~/.recall/db.sqlite` — plain SQLite, inspect with `sqlite3`
+- Embeddings: `all-MiniLM-L6-v2` running on-device via transformers.js (~23MB, downloaded once)
+- Network: zero, after the model is cached
+- Sync: bring your own. Point `~/.recall/` at iCloud / Dropbox / syncthing if you want multi-machine
+
+## Differences from the alternatives
+
+- **AGENTS.md / CLAUDE.md** are static and per-repo. recall is per-machine and writes during conversation.
+- **claude-mem** runs the agent SDK on every Stop hook to compress sessions. recall writes raw structured context with no LLM call. Faster.
+- **Anthropic's native memory (v2.1.30+)** is Claude-only, 200-line cap, exact-keyword search. recall is cross-agent, unbounded, semantic.
+- **mem0 / OpenMemory** ships a Docker stack with Postgres + Qdrant + a dashboard. recall is one binary and one SQLite file.
+
+## License
+
+MIT. Star the repo if recall earns its keep.
